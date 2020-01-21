@@ -1,1 +1,148 @@
-<p>hello</p>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Document</title>
+    <style>
+    .main{
+        width: 200px;
+        height: 200px;
+        position: absolute;
+        left: 0;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        margin: auto;
+        border: 1px solid #eee;
+    }
+    .writediv{
+        width: 100%;
+        height: calc(100% - 50px);
+    }
+    </style>
+</head>
+<body>
+    <div id="sss">sdsadas</div>
+    <div class="main">
+        <div class="anniu" contenteditable="false">
+            <button onclick="changbr(event)">变粗</button>
+        </div>
+        <div class="writediv" id="j-div" contenteditable="true"></div>
+    </div>
+    <script>
+        //比较差异性
+        let patches = {};
+        let index = 0;
+        
+        const ATTR = 0;
+        const TEXT = 1;
+        const REMOVE = 2;
+        const REPLACE = 3;
+        
+        function diff(oldTree, newTree){
+            walk(oldTree, newTree, index);
+        }
+        
+        function walk(oldNode, newNode, index){
+            let patch = [];
+            // 删除
+            if(!newNode){
+                patch.push({type: REMOVE, index});
+            // 文本
+            }else if((typeof oldNode === "string") && (typeof newNode === "string")){
+                if(newNode !== oldNode){
+                    patch.push({type: TEXT, text: newNode});
+                }
+            }else if(oldNode.type === newNode.type){
+                // 属性
+                let attr = diffAttr(oldNode.props, newNode.props);
+                if (Object.keys(attr).length > 0) {
+                    patch.push({ type: ATTR, attr });
+                }
+                diffChildren(oldNode.children, newNode.children);
+            }else {
+                // 替换
+                patch.push({type: REPLACE, newNode});
+            }
+            if(patch.length > 0){
+                patches[index] = patch;
+            }
+        }
+        // 比较属性的不同
+        function diffAttr(oldAttr, newAttr){
+            let attr = {};
+            // 看两个属性是否不同（修改）
+            for (key in oldAttr) {
+                    if(oldAttr[key] != newAttr[key]){
+                        attr[key] = newAttr[key];
+                    }
+            }
+            // 是否新增
+            for (key in newAttr) {
+                    if(!oldAttr.hasOwnProperty(key)){
+                        attr[key] = newAttr[key];
+                    }
+            }
+            return attr;
+        }
+        // 比较子节点的属性
+        function diffChildren(oldChildren, newChildren){
+            oldChildren.forEach(function(child, i){
+                walk(child, newChildren[i], ++ index);
+            });
+        }
+
+
+
+
+
+
+        //打补丁
+        function doPatch(node, patch){
+            patch.forEach((p)=>{
+                switch (p.type) {
+                    case ATTR:
+                        // 遍历属性
+                        for (key in p.attr) {
+                            let value = p.attr[key];
+                            // 如果有值（其实就是上一篇虚拟DOM中的设置属性）
+                            if(value){
+                                if(key === "value"){
+                                if(node.type.toUpperCase() === "INPUT" || node.type.toUpperCase() === "TEXTAREA"){
+                                    node.value = value;
+                                }
+                            }else {
+                                node.setAttribute(key, value);
+                            }
+                            // 没有值，就是删除属性
+                            }else {
+                                node.removeAttribute(key);
+                            }
+                        }
+                        break;
+                    case TEXT:
+                        // 替换文本节点
+                        node.textContent = p.text;
+                        break;
+                    case REMOVE:
+                        // 删除自己
+                        node.parentNode.removeChild(node);
+                        break;
+                    case REPLACE:
+                        let { newNode } = p;
+                        // 如果是元素就创建元素否则就是文本
+                        newNode = (newNode instanceof Element) ?  createDom(newNode): document.createTextNode(newNode);
+                        // 用新节点替换旧结点
+                        newNode.parentNode.replaceChild(newNode, node);
+                        break;
+                    default:
+                        break;
+                }
+            })
+        }
+    </script>
+</body>
+</html>
